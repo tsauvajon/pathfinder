@@ -1,8 +1,6 @@
 extern crate rand;
 
 use std::fmt;
-// use std::thread::sleep;
-// use std::time::Duration;
 
 use rand::Rng;
 
@@ -122,10 +120,6 @@ impl fmt::Display for Node {
     }
 }
 
-// struct Canvas {
-//     grid: Grid,
-// }
-
 type Grid = Vec<Vec<Node>>;
 
 trait GridMethods {
@@ -161,15 +155,6 @@ impl GridMethods for Grid {
         };
     }
 
-    fn width(&self) -> usize {
-        self.len()
-    }
-
-    fn height(&self) -> usize {
-        self[0].len()
-    }
-
-
     fn neighbours(&self, i: usize, j: usize) -> Vec<Node> {
         let mut nb: Vec<Node> = vec![];
 
@@ -189,6 +174,15 @@ impl GridMethods for Grid {
         }
 
         nb
+    }
+
+    fn width(&self) -> usize {
+        self.len()
+    }
+
+
+    fn height(&self) -> usize {
+        self[0].len()
     }
 }
 
