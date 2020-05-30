@@ -22,8 +22,6 @@ enum Msg {
     Select(usize, usize),
 }
 
-
-
 impl Component for Model {
     type Message = Msg;
     type Properties = ();
@@ -31,7 +29,7 @@ impl Component for Model {
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
         // console_error_panic_hook::set_once();
 
-        let mut g= Grid::create(20,20);
+        let mut g = Grid::create(20, 20);
         // let mut rng = rand::thread_rng();
         //
         // let sx: usize = rng.gen_range(0, g.width());
@@ -66,23 +64,10 @@ impl Component for Model {
     fn view(&self) -> Html {
         html! {
             <div>
-                <button onclick=self.link.callback(|_| Msg::AddOne)>{ "+1" }</button>
+                // <button onclick=self.link.callback(|_| Msg::AddOne)>{ "+1" }</button>
                 <p>{ self.value }</p>
                 {
-                    for self.grid.iter().map(|mut row| {
-                        html! {
-                            <div>
-                                {
-                                    for row.iter().map(|node| {
-                                        // html! {<button>{ "X" }</button>}
-                                        "X"
-                                    })
-                                }
-                            </div>
-                        }
-                        // item.props.value = format!("item-{}", item.props.value);
-                        // item
-                    })
+                    self.grid.render()
                 }
 
                 // <button onclick=self.link.callback(|_| Msg:Select(4, 4))></button>

@@ -1,9 +1,9 @@
 extern crate rand;
 
+use rand::Rng;
 use std::fmt;
 
-use rand::Rng;
-
+use yew::prelude::*;
 
 fn main() {
     let grid = Grid::create(15, 15);
@@ -22,7 +22,6 @@ fn main() {
         solve(g);
     }
 }
-
 
 #[derive(fmt::Debug, Copy, Clone)]
 pub enum State {
@@ -44,7 +43,6 @@ impl fmt::Display for State {
         }
     }
 }
-
 
 #[derive(fmt::Debug, Copy, Clone)]
 pub struct Node {
@@ -110,7 +108,13 @@ impl Node {
         if self.is_visited() {
             self.state = State::Path;
             self.parent_coords
-        } else { None }
+        } else {
+            None
+        }
+    }
+
+    pub fn render(&self) -> Html {
+        html! {<button>{ format!("{}", self.state) }</button>}
     }
 }
 
@@ -130,6 +134,8 @@ pub trait GridMethods {
 
     fn width(&self) -> usize;
     fn height(&self) -> usize;
+
+    fn render(&self) -> Html;
 }
 
 impl GridMethods for Grid {
@@ -139,9 +145,9 @@ impl GridMethods for Grid {
             let mut row: Vec<Node> = vec![];
             for j in 0..height {
                 row.push(Node::new(i, j));
-            };
+            }
             matrix.push(row);
-        };
+        }
         matrix
     }
 
@@ -152,23 +158,20 @@ impl GridMethods for Grid {
                 print!("({}) ", n.state);
             }
             println!();
-        };
+        }
     }
 
     fn neighbours(&self, i: usize, j: usize) -> Vec<Node> {
         let mut nb: Vec<Node> = vec![];
 
-        let possible_nb: Vec<(isize, isize)> = vec![
-            (-1, 0),
-            (1, 0),
-            (0, -1),
-            (0, 1),
-        ];
+        let possible_nb: Vec<(isize, isize)> = vec![(-1, 0), (1, 0), (0, -1), (0, 1)];
 
         for p in possible_nb {
-            let nb_i = (i as isize+p.0) as usize;
-            let nb_j = (j as isize+p.1) as usize;
-            if (0..self.width() as usize).contains(&nb_i) && (0..self.height() as usize).contains(&nb_j) {
+            let nb_i = (i as isize + p.0) as usize;
+            let nb_j = (j as isize + p.1) as usize;
+            if (0..self.width() as usize).contains(&nb_i)
+                && (0..self.height() as usize).contains(&nb_j)
+            {
                 nb.push(self[nb_i][nb_j].clone());
             }
         }
@@ -180,9 +183,26 @@ impl GridMethods for Grid {
         self.len()
     }
 
-
     fn height(&self) -> usize {
         self[0].len()
+    }
+
+    fn render(&self) -> Html {
+        html! {
+            for self.iter().map(|mut row| {
+                html! {
+                    <div>
+                        {
+                            for row.iter().map(|n| {
+                                n.render()
+                                // "X"
+                            })
+                        }
+                    // <button onclick=self.link.callback(|_| Msg::AddOne)>{ "+1" }</button>
+                    </div>
+                }
+            })
+        }
     }
 }
 
@@ -198,12 +218,12 @@ fn step(g: Grid) -> Option<Grid> {
 
             next[n.x][n.y].active = false;
 
-            let nbs =  g.neighbours(n.x, n.y);
-            for nb in nbs{
+            let nbs = g.neighbours(n.x, n.y);
+            for nb in nbs {
                 if nb.is_target() {
                     let end = mark_path(next, n);
                     end.print();
-                    return None
+                    return None;
                 } else if nb.is_empty() {
                     next[nb.x][nb.y].visit(i, j);
                 }
@@ -222,9 +242,9 @@ fn mark_path(g: Grid, n: &Node) -> Grid {
     loop {
         match next[x][y].mark_path() {
             Some((nx, ny)) => {
-                x=nx;
-                y=ny;
-            },
+                x = nx;
+                y = ny;
+            }
             None => break,
         }
     }
@@ -232,13 +252,12 @@ fn mark_path(g: Grid, n: &Node) -> Grid {
     next
 }
 
-
 pub fn solve(g: Grid) {
     let mut g = g;
     loop {
         g = match step(g) {
             Some(next) => next,
-            None => return
+            None => return,
         };
     }
 }
