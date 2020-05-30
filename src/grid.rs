@@ -25,7 +25,7 @@ fn main() {
 
 
 #[derive(fmt::Debug, Copy, Clone)]
-enum State {
+pub enum State {
     Empty,
     Start,
     Visited,
@@ -47,7 +47,7 @@ impl fmt::Display for State {
 
 
 #[derive(fmt::Debug, Copy, Clone)]
-struct Node {
+pub struct Node {
     x: usize,
     y: usize,
     state: State,
@@ -87,12 +87,12 @@ impl Node {
         }
     }
 
-    fn set_start(&mut self) {
+    pub fn set_start(&mut self) {
         self.state = State::Start;
         self.active = true;
     }
 
-    fn set_target(&mut self) {
+    pub fn set_target(&mut self) {
         self.state = State::Target;
     }
 
@@ -120,9 +120,9 @@ impl fmt::Display for Node {
     }
 }
 
-type Grid = Vec<Vec<Node>>;
+pub type Grid = Vec<Vec<Node>>;
 
-trait GridMethods {
+pub trait GridMethods {
     fn create(width: usize, height: usize) -> Self;
     fn print(&self);
 
@@ -233,7 +233,7 @@ fn mark_path(g: Grid, n: &Node) -> Grid {
 }
 
 
-fn solve(g: Grid) {
+pub fn solve(g: Grid) {
     let mut g = g;
     loop {
         g = match step(g) {
