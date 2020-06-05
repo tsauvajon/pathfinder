@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use wasm_bindgen::prelude::*;
 use yew::prelude::*;
-use yew::services::{ConsoleService, IntervalService};
+use yew::services::{ConsoleService, IntervalService, Task};
 
 // use node::{Cell, Node};
 
@@ -184,6 +184,7 @@ struct Model {
     link: ComponentLink<Self>,
     value: i64,
     grid: Grid,
+    job: Box<Task>,
 }
 
 enum Msg {
@@ -208,6 +209,7 @@ impl Component for Model {
             link,
             value: 0,
             grid: g,
+            job: Box::new(handle), // enable interval
         }
     }
 
@@ -218,10 +220,11 @@ impl Component for Model {
             Msg::Next => {
                 match step(self.grid.clone()) {
                     Some(next) => {
+                        self.value += 1;
                         self.grid = next;
                         true
                     }
-                    None => false, // stop callbacks
+                    None => false, // TODO: stop callbacks
                 }
             }
         }
@@ -237,6 +240,7 @@ impl Component for Model {
     fn view(&self) -> Html {
         html! {
             <div>
+                { self.value }
                 { self.grid.render() }
             </div>
         }
