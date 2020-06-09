@@ -218,14 +218,21 @@ impl Component for Model {
         console.log("hello");
         match msg {
             Msg::Next => {
-                match step(self.grid.clone()) {
-                    Some(next) => {
-                        self.value += 1;
-                        self.grid = next;
-                        true
-                    }
-                    None => false, // TODO: stop callbacks
+                if step1(&mut self.grid) {
+                    self.value += 1;
+                    true
+                } else {
+                    console.log("done");
+                    false
                 }
+                // match step(self.grid.clone()) {
+                //     Some(next) => {
+                //         self.value += 1;
+                //         self.grid = next;
+                //         true
+                //     }
+                //     None => false, // TODO: stop callbacks
+                // }
             }
         }
     }
@@ -340,14 +347,39 @@ impl GridMethods for Grid {
 
 /// update grid by one step
 /// actually for now it's one loop not 1 step
-pub fn step_mut(mut g: Grid) -> bool {
-    match step(g.clone()) {
-        Some(next) => {
-            g = next;
-            true
+// pub fn step_mut(mut g: Grid) -> bool {
+//     match step(g.clone()) {
+//         Some(next) => {
+//             g = next;
+//             true
+//         }
+//         None => false,
+//     }
+// }
+
+fn step1(g: &mut Grid) -> bool {
+    for (i, r) in g.clone().iter().enumerate() {
+        for (j, n) in r.iter().enumerate() {
+            if !n.active {
+                continue;
+            };
+
+            g[n.x][n.y].active = false;
+
+            let nbs = g.neighbours(n.x, n.y);
+            for nb in nbs {
+                if nb.is_target() {
+                    let end = mark_path1(g, n);
+                    // end.print();
+                    return false;
+                } else if nb.is_empty() {
+                    g[nb.x][nb.y].visit(i, j);
+                }
+            }
         }
-        None => false,
     }
+
+    true
 }
 
 fn step(g: Grid) -> Option<Grid> {
@@ -378,6 +410,22 @@ fn step(g: Grid) -> Option<Grid> {
     Some(next)
 }
 
+fn mark_path1(g: &mut Grid, n: &Node) {
+    // let mut next = g;
+    let mut x = n.x;
+    let mut y = n.y;
+
+    loop {
+        match g[x][y].mark_path() {
+            Some((nx, ny)) => {
+                x = nx;
+                y = ny;
+            }
+            None => break,
+        }
+    }
+}
+
 fn mark_path(g: Grid, n: &Node) -> Grid {
     let mut next = g;
     let mut x = n.x;
@@ -396,12 +444,15 @@ fn mark_path(g: Grid, n: &Node) -> Grid {
     next
 }
 
-pub fn solve(g: Grid) {
-    let mut g = g;
+pub fn solve(g: &mut Grid) {
+    // let mut g = g;
     loop {
-        g = match step(g) {
-            Some(next) => next,
-            None => return,
-        };
+        if !step1(g) {
+            return;
+        }
+        // g = match step1(mut g) {
+        //     Some(next) => next,
+        //     None => return,
+        // };
     }
 }
