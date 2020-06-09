@@ -5,7 +5,7 @@
 build: ## Build the Yew app
 	wasm-pack build --target web --out-name wasm --out-dir ./static
 
-serve: ## Build the Yew app
+serve: ## Serve locally on port 8888
 	miniserve ./static --index index.html -p 8888
 
 help: ## Print this message
