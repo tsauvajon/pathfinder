@@ -1,37 +1,11 @@
-// mod node;
-
+#![recursion_limit = "512"]
 use std::time::Duration;
 
 use wasm_bindgen::prelude::*;
 use yew::prelude::*;
 use yew::services::{ConsoleService, IntervalService, Task};
 
-// use node::{Cell, Node};
-
-// extern crate rand;
-
-// use rand::Rng;
 use std::fmt;
-
-use yew::prelude::*;
-
-// fn main() {
-//     let grid = Grid::create(15, 15);
-//
-//     let mut rng = rand::thread_rng();
-//     for _ in 0..20 {
-//         let mut g = grid.clone();
-//
-//         let sx: usize = rng.gen_range(0, g.width());
-//         let sy: usize = rng.gen_range(0, g.height());
-//         let tx: usize = rng.gen_range(0, g.width());
-//         let ty: usize = rng.gen_range(0, g.height());
-//
-//         g[sx][sy].set_start();
-//         g[tx][ty].set_target();
-//         solve(g);
-//     }
-// }
 
 #[derive(fmt::Debug, Copy, Clone, PartialEq)]
 pub enum State {
@@ -163,7 +137,8 @@ impl Component for Cell {
     fn change(&mut self, props: Self::Properties) -> ShouldRender {
         // Should only return "true" if new properties are different to
         // previously received properties.
-        self.active == props.active && self.state == props.state
+        true
+        // self.active == props.active && self.state == props.state
     }
 
     fn view(&self) -> Html {
@@ -174,43 +149,34 @@ impl Component for Cell {
         }
     }
 }
-// impl fmt::Display for Node {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         write!(f, "({}, {})", self.x, self.y)
-//     }
-// }
 
-struct Model {
-    link: ComponentLink<Self>,
-    value: i64,
-    grid: Grid,
-    job: Box<Task>,
-}
-
-enum Msg {
+pub enum Msg {
     Next,
     // Select(usize, usize),
 }
 
-impl Component for Model {
+impl Component for Grid {
     type Message = Msg;
     type Properties = ();
 
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
-        let mut g = Grid::create(20, 20);
-
         let callback = link.callback(|_| Msg::Next);
         let mut interval = IntervalService::new();
         let handle = interval.spawn(Duration::from_millis(200), callback);
 
-        g[3][3].set_start();
-        g[14][14].set_target();
-        Self {
+        let mut m = new_matrix(20, 20);
+
+        m[3][3].set_start();
+        m[14][14].set_target();
+
+        let g = Self {
+            matrix: m,
             link,
             value: 0,
-            grid: g,
             job: Box::new(handle), // enable interval
-        }
+        };
+
+        g
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
@@ -218,21 +184,13 @@ impl Component for Model {
         console.log("hello");
         match msg {
             Msg::Next => {
-                if step1(&mut self.grid) {
+                if step(&mut self.matrix) {
                     self.value += 1;
                     true
                 } else {
                     console.log("done");
                     false
                 }
-                // match step(self.grid.clone()) {
-                //     Some(next) => {
-                //         self.value += 1;
-                //         self.grid = next;
-                //         true
-                //     }
-                //     None => false, // TODO: stop callbacks
-                // }
             }
         }
     }
@@ -248,7 +206,19 @@ impl Component for Model {
         html! {
             <div>
                 { self.value }
-                { self.grid.render() }
+                {
+                for self.matrix.iter().map(|mut row| {
+                    html! {
+                        <div>
+                            {
+                                for row.iter().map(|n| {
+                                    html! { <Cell state=n.state active=n.active /> }
+                                })
+                            }
+                        </div>
+                    }
+                })
+            }
             </div>
         }
     }
@@ -256,48 +226,31 @@ impl Component for Model {
 
 #[wasm_bindgen(start)]
 pub fn run_app() {
-    App::<Model>::new().mount_to_body();
+    App::<Grid>::new().mount_to_body();
 }
 
 ///////////////
 
-pub type Grid = Vec<Vec<Node>>;
+pub type Matrix = Vec<Vec<Node>>;
 
-pub trait GridMethods {
-    fn create(width: usize, height: usize) -> Self;
-    fn print(&self);
-
+fn new_matrix(width: usize, height: usize) -> Matrix {
+    let mut g = vec![];
+    for i in 0..width {
+        let mut row: Vec<Node> = vec![];
+        for j in 0..height {
+            row.push(Node::new(i, j));
+        }
+        g.push(row);
+    }
+    g
+}
+pub trait MatrixMethods {
     fn neighbours(&self, i: usize, j: usize) -> Vec<Node>;
-
     fn width(&self) -> usize;
     fn height(&self) -> usize;
-
-    fn render(&self) -> Html;
 }
 
-impl GridMethods for Grid {
-    fn create(width: usize, height: usize) -> Grid {
-        let mut matrix: Grid = vec![];
-        for i in 0..width {
-            let mut row: Vec<Node> = vec![];
-            for j in 0..height {
-                row.push(Node::new(i, j));
-            }
-            matrix.push(row);
-        }
-        matrix
-    }
-
-    fn print(&self) {
-        print!("\x1B[2J");
-        for r in self {
-            for n in r {
-                print!("({}) ", n.state);
-            }
-            println!();
-        }
-    }
-
+impl MatrixMethods for Matrix {
     fn neighbours(&self, i: usize, j: usize) -> Vec<Node> {
         let mut nb: Vec<Node> = vec![];
 
@@ -323,57 +276,32 @@ impl GridMethods for Grid {
     fn height(&self) -> usize {
         self[0].len()
     }
-
-    fn render(&self) -> Html {
-        html! {
-            // <div>{ "hello" }</div>
-            for self.iter().map(|mut row| {
-                html! {
-                    <div>
-                        {
-                            for row.iter().map(|n| {
-                            // "a"
-                                html! { <Cell state=n.state active=n.active /> }
-                                // n.render()
-                            })
-                        }
-                    // <button onclick=self.link.callback(|_| Msg::AddOne)>{ "+1" }</button>
-                    </div>
-                }
-            })
-        }
-    }
 }
 
-/// update grid by one step
-/// actually for now it's one loop not 1 step
-// pub fn step_mut(mut g: Grid) -> bool {
-//     match step(g.clone()) {
-//         Some(next) => {
-//             g = next;
-//             true
-//         }
-//         None => false,
-//     }
-// }
+pub struct Grid {
+    matrix: Matrix,
+    link: ComponentLink<Self>,
+    value: i64,
+    job: Box<Task>,
+}
 
-fn step1(g: &mut Grid) -> bool {
-    for (i, r) in g.clone().iter().enumerate() {
+fn step(m: &mut Matrix) -> bool {
+    for (i, r) in m.clone().iter().enumerate() {
         for (j, n) in r.iter().enumerate() {
             if !n.active {
                 continue;
             };
 
-            g[n.x][n.y].active = false;
+            m[n.x][n.y].active = false;
 
-            let nbs = g.neighbours(n.x, n.y);
+            let nbs = m.neighbours(n.x, n.y);
             for nb in nbs {
                 if nb.is_target() {
-                    let end = mark_path1(g, n);
+                    let end = mark_path(m, n);
                     // end.print();
                     return false;
                 } else if nb.is_empty() {
-                    g[nb.x][nb.y].visit(i, j);
+                    m[nb.x][nb.y].visit(i, j);
                 }
             }
         }
@@ -382,77 +310,17 @@ fn step1(g: &mut Grid) -> bool {
     true
 }
 
-fn step(g: Grid) -> Option<Grid> {
-    // todo: keep track of active nodes to skip lots of browsing
-    // and also if active.len() == 0 that means there's no path
-    let mut next = g.clone();
-    for (i, r) in g.iter().enumerate() {
-        for (j, n) in r.iter().enumerate() {
-            if !n.active {
-                continue;
-            };
-
-            next[n.x][n.y].active = false;
-
-            let nbs = g.neighbours(n.x, n.y);
-            for nb in nbs {
-                if nb.is_target() {
-                    let end = mark_path(next, n);
-                    // end.print();
-                    return None;
-                } else if nb.is_empty() {
-                    next[nb.x][nb.y].visit(i, j);
-                }
-            }
-        }
-    }
-
-    Some(next)
-}
-
-fn mark_path1(g: &mut Grid, n: &Node) {
-    // let mut next = g;
+fn mark_path(m: &mut Matrix, n: &Node) {
     let mut x = n.x;
     let mut y = n.y;
 
     loop {
-        match g[x][y].mark_path() {
+        match m[x][y].mark_path() {
             Some((nx, ny)) => {
                 x = nx;
                 y = ny;
             }
             None => break,
         }
-    }
-}
-
-fn mark_path(g: Grid, n: &Node) -> Grid {
-    let mut next = g;
-    let mut x = n.x;
-    let mut y = n.y;
-
-    loop {
-        match next[x][y].mark_path() {
-            Some((nx, ny)) => {
-                x = nx;
-                y = ny;
-            }
-            None => break,
-        }
-    }
-
-    next
-}
-
-pub fn solve(g: &mut Grid) {
-    // let mut g = g;
-    loop {
-        if !step1(g) {
-            return;
-        }
-        // g = match step1(mut g) {
-        //     Some(next) => next,
-        //     None => return,
-        // };
     }
 }
