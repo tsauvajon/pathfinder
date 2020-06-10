@@ -3,7 +3,8 @@ body {
 }
 
 button {
-    background: #8b81fc;
+    background: #bd93f9;
+    color: #f8f8f2;
     /* background: linear-gradient(20deg, #c576db, #8b81fc); */
     border: none;
     padding: 10px;
