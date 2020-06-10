@@ -28,6 +28,16 @@ impl fmt::Display for State {
     }
 }
 
+fn state_class(state: State) -> String {
+    match state {
+        State::Path => String::from("path"),
+        State::Empty => String::from("empty"),
+        State::Start => String::from("start"),
+        State::Visited => String::from("visited"),
+        State::Target => String::from("target"),
+    }
+}
+
 #[derive(fmt::Debug, Clone)]
 pub struct Node {
     x: usize,
@@ -99,59 +109,9 @@ impl Node {
     }
 }
 
-pub struct Cell {
-    state: State,
-    active: bool,
-    link: ComponentLink<Self>,
-}
-
-#[derive(Properties, Clone)]
-pub struct Props {
-    pub state: State,
-    pub active: bool,
-}
-
-pub enum CellMsg {
-    Select,
-}
-
-impl Component for Cell {
-    type Message = CellMsg;
-    type Properties = Props;
-
-    fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        Self {
-            state: props.state,
-            active: props.active,
-            link,
-        }
-    }
-
-    fn update(&mut self, msg: Self::Message) -> ShouldRender {
-        match msg {
-            CellMsg::Select => self.state = State::Visited,
-        }
-        true
-    }
-
-    fn change(&mut self, props: Self::Properties) -> ShouldRender {
-        // Should only return "true" if new properties are different to
-        // previously received properties.
-        true
-        // self.active == props.active && self.state == props.state
-    }
-
-    fn view(&self) -> Html {
-        html! {
-            <button onclick=self.link.callback(|_| CellMsg::Select)>
-                { format!("{}", self.state) }
-            </button>
-        }
-    }
-}
-
 pub enum Msg {
     Next,
+    Random,
     // Select(usize, usize),
 }
 
@@ -170,9 +130,10 @@ impl Component for Grid {
         m[14][14].set_target();
 
         let g = Self {
+            done: false,
             matrix: m,
             link,
-            value: 0,
+            steps: 0,
             job: Box::new(handle), // enable interval
         };
 
@@ -180,17 +141,30 @@ impl Component for Grid {
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
+        if self.done {
+            return false;
+        }
+
         let mut console = ConsoleService::new();
-        console.log("hello");
+        console.log(format!("{}", self.matrix[10][10].state).as_ref());
         match msg {
             Msg::Next => {
                 if step(&mut self.matrix) {
-                    self.value += 1;
+                    self.steps += 1;
                     true
                 } else {
                     console.log("done");
-                    false
+                    self.done = true;
+                    true
                 }
+            }
+            Msg::Random => {
+                self.done = false;
+                self.matrix = new_matrix(30, 30);
+                self.matrix[23][28].set_start();
+                self.matrix[1][9].set_target();
+
+                true
             }
         }
     }
@@ -199,27 +173,30 @@ impl Component for Grid {
         // Should only return "true" if new properties are different to
         // previously received properties.
         // This component has no properties so we will always return "false".
-        false
+        true
     }
 
     fn view(&self) -> Html {
         html! {
-            <div>
-                { self.value }
+            <>
+            <button onclick=|_| Msg::Random,>{"Reset"}</button>
+            // { self.value }
+            <div class="board">
                 {
-                for self.matrix.iter().map(|mut row| {
-                    html! {
-                        <div>
-                            {
-                                for row.iter().map(|n| {
-                                    html! { <Cell state=n.state active=n.active /> }
-                                })
-                            }
-                        </div>
-                    }
-                })
-            }
+                    for self.matrix.iter().map(|mut row| {
+                        html! {
+                            <div class="row">
+                                {
+                                    for row.iter().map(|n| {
+                                        html! { <span class=("cell", state_class(n.state))>{'\u{00a0}'}</span> }
+                                    })
+                                }
+                            </div>
+                        }
+                    })
+                }
             </div>
+            </>
         }
     }
 }
@@ -281,7 +258,8 @@ impl MatrixMethods for Matrix {
 pub struct Grid {
     matrix: Matrix,
     link: ComponentLink<Self>,
-    value: i64,
+    steps: i64,
+    done: bool,
     job: Box<Task>,
 }
 
