@@ -141,14 +141,13 @@ impl Component for Grid {
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
-        if self.done {
-            return false;
-        }
-
         let mut console = ConsoleService::new();
         console.log(format!("{}", self.matrix[10][10].state).as_ref());
         match msg {
             Msg::Next => {
+                if self.done {
+                    return false;
+                }
                 if step(&mut self.matrix) {
                     self.steps += 1;
                     true
@@ -179,7 +178,7 @@ impl Component for Grid {
     fn view(&self) -> Html {
         html! {
             <>
-            <button onclick=|_| Msg::Random,>{"Reset"}</button>
+            <button onclick=self.link.callback(|_| Msg::Random)>{"Reset"}</button>
             // { self.value }
             <div class="board">
                 {
