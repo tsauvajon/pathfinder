@@ -1,12 +1,11 @@
 #![recursion_limit = "512"]
-use std::time::Duration;
 
 use wasm_bindgen::prelude::*;
 use yew::prelude::*;
-use yew::services::{ConsoleService, IntervalService, Task};
+use yew::services::{IntervalService, Task};
 
-use crate::State::Start;
 use std::fmt;
+use std::time::Duration;
 
 #[derive(fmt::Debug, Copy, Clone, PartialEq)]
 pub enum State {
@@ -106,15 +105,6 @@ impl Node {
         }
     }
 
-    pub fn set_start(&mut self) {
-        self.state = State::Start;
-        self.active = true;
-    }
-
-    pub fn set_target(&mut self) {
-        self.state = State::Target;
-    }
-
     fn visit(&mut self, p_x: usize, p_y: usize) {
         match self.state {
             State::Empty => (),
@@ -152,18 +142,18 @@ impl Component for Grid {
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
         let callback = link.callback(|_| Msg::Next);
         let mut interval = IntervalService::new();
-        let handle = interval.spawn(Duration::from_millis(50), callback);
-
-        let mut m = new_matrix(20, 40);
+        let handle = interval.spawn(Duration::from_millis(100), callback);
 
         let g = Self {
             stage: Stage::Init,
-            matrix: m,
+            matrix: new_matrix(20, 40),
             link,
             steps: 0,
             start: None,
             target: None,
             down: false,
+            moving_target: false,
+            moving_start: false,
             job: Box::new(handle), // enable interval
         };
 
@@ -171,15 +161,12 @@ impl Component for Grid {
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
-        let mut console = ConsoleService::new();
-        console.log(format!("{}", self.matrix[10][10].state).as_ref());
         match msg {
             Msg::Next => match self.stage {
                 Stage::Started => {
                     if step(&mut self.matrix) {
                         self.steps += 1;
                     } else {
-                        console.log("done");
                         self.stage = Stage::Done;
                     }
                     true
@@ -213,13 +200,17 @@ impl Component for Grid {
                             false
                         }
                     }
-                    Stage::StartSet => {
-                        if let Some(_) = self.target {
+                    Stage::StartSet => match self.target {
+                        Some(_) => {
                             self.stage = Stage::TargetSet;
                             true
-                        } else {
-                            false
                         }
+                        None => false,
+                    },
+                    Stage::Done => {
+                        self.moving_start = false;
+                        self.moving_target = false;
+                        false
                     }
                     _ => false,
                 }
@@ -249,10 +240,23 @@ impl Component for Grid {
         html! {
             <>
             <button onclick=self.link.callback(|_| Msg::Reset)>{"Reset"}</button>
-            <button onclick=self.link.callback(|_| Msg::Start)>{"Start/Pause"}</button>
+            {
+                match self.stage {
+                    Stage::TargetSet | Stage::Paused => html! {
+                        <button onclick=self.link.callback(|_| Msg::Start)>
+                        {"Start"}
+                        </button>
+                    },
+                    Stage::Started => html! {
+                        <button onclick=self.link.callback(|_| Msg::Start)>
+                        {"Pause"}
+                        </button>
+                    },
+                    _ => html!{},
+                }
+            }
             <br />
             <div class="help">{ self.help() }</div>
-            <div>{ self.stage }{ self.steps }</div>
             <div class="board disable-select">
             {
                 for self.matrix.iter().enumerate().map(|(i, mut row)| {
@@ -286,45 +290,58 @@ impl Grid {
     fn help(&self) -> Html {
         html! {
             <>
-            {"Next step:"}
-            {'\u{00a0}'}
             {
                 match self.stage {
-                    Stage::Init => html! {<>{"mark"}<div class="cell start" />{"start"}</>},
-                    Stage::StartSet => html! {<>{"mark"}<div class="cell target" />{"target"}</>},
-                    Stage::TargetSet =>html! {<>{"mark"}<div class="cell wall" />{"wall"}</>},
-                    Stage::Started => html! {"solving..."},
-                    Stage::Paused => html! {"paused"},
-                    Stage::Done => html! {"shortest path found!"},
+                    Stage::Init => html! {<>{"Place"}<div class="cell start" />{"start"}</>},
+                    Stage::StartSet => html! {<>{"Place"}<div class="cell target" />{"target"}</>},
+                    Stage::TargetSet =>html! {<>{"Place"}<div class="cell wall" />{"walls and Start when ready"}</>},
+                    Stage::Started => html! {"Solving..."},
+                    Stage::Paused => html! {"Paused"},
+                    Stage::Done => html! {
+                        <>
+                        {"Move"}
+                        <div class="cell start" />
+                        {"start or"}
+                        <div class="cell target" />
+                        {"target around!"}
+                        </>
+                    },
                 }
             }
             </>
         }
     }
 
+    pub fn set_start(&mut self, i: usize, j: usize) {
+        if let Some((i, j)) = self.start {
+            self.matrix[i][j].state = State::Empty;
+        };
+
+        self.start = Some((i, j));
+        self.matrix[i][j].state = State::Start;
+        self.matrix[i][j].active = true;
+    }
+
+    fn set_target(&mut self, i: usize, j: usize) {
+        if let Some((i, j)) = self.target {
+            self.matrix[i][j].state = State::Empty;
+        };
+
+        self.target = Some((i, j));
+        self.matrix[i][j].state = State::Target;
+    }
+
     // mouse down, either initially or on reaching a new cell
     fn activate(&mut self, i: usize, j: usize) -> bool {
         match self.stage {
             Stage::Init => {
-                if let Some((x, y)) = self.start {
-                    self.matrix[x][y].state = State::Empty;
-                };
-
-                self.matrix[i][j].set_start();
-                self.start = Some((i, j));
-                // self.stage = Stage::StartSet;
+                self.set_start(i, j);
                 true
             }
             Stage::StartSet => match self.matrix[i][j].state {
                 State::Start => false,
                 _ => {
-                    if let Some((x, y)) = self.target {
-                        self.matrix[x][y].state = State::Empty;
-                    };
-
-                    self.matrix[i][j].set_target();
-                    self.target = Some((i, j));
-
+                    self.set_target(i, j);
                     true
                 }
             },
@@ -338,14 +355,64 @@ impl Grid {
             Stage::Started => false,
             Stage::Paused => false,
             Stage::Done => {
-                if self.matrix[i][j].state != State::Target {
-                    false
-                } else {
-                    true
+                match self.matrix[i][j].state {
+                    State::Target => {
+                        if !self.moving_target && !self.moving_start {
+                            self.moving_target = true;
+                        }
+                    }
+                    State::Start => {
+                        if !self.moving_target && !self.moving_start {
+                            self.moving_start = true;
+                        }
+                    }
+                    State::Wall => {}
+                    _ => {
+                        if self.moving_target {
+                            self.set_target(i, j);
+                            self.update_solution();
+                            return true;
+                        }
+
+                        if self.moving_start {
+                            self.set_start(i, j);
+                            self.update_solution();
+                            return true;
+                        }
+                    }
                 }
-                // TODO: move target and solve
+
+                false
             }
         }
+    }
+
+    // clears "visited", "path"
+    // keeps "start", "target", "wall"
+    fn clear(&mut self) {
+        for i in 0..self.matrix.height() {
+            for j in 0..self.matrix.width() {
+                self.matrix[i][j].active = false;
+                match self.matrix[i][j].state {
+                    State::Start => self.matrix[i][j].active = true,
+                    State::Target | State::Wall | State::Empty => {}
+                    _ => self.matrix[i][j].state = State::Empty,
+                }
+            }
+        }
+    }
+
+    fn solve(&mut self) {
+        loop {
+            if !step(&mut self.matrix) {
+                return;
+            }
+        }
+    }
+
+    fn update_solution(&mut self) {
+        self.clear();
+        self.solve();
     }
 }
 
@@ -391,12 +458,12 @@ impl MatrixMethods for Matrix {
         nb
     }
 
-    fn height(&self) -> usize {
-        self.len()
-    }
-
     fn width(&self) -> usize {
         self[0].len()
+    }
+
+    fn height(&self) -> usize {
+        self.len()
     }
 }
 
@@ -409,18 +476,26 @@ pub struct Grid {
     start: Option<(usize, usize)>,
     target: Option<(usize, usize)>,
     stage: Stage,
+
+    // flags
     down: bool,
+    moving_target: bool,
+    moving_start: bool,
 
     // Worker
     job: Box<Task>,
 }
 
 fn step(m: &mut Matrix) -> bool {
+    let mut active_nb = 0;
+
     for (i, r) in m.clone().iter().enumerate() {
         for (j, n) in r.iter().enumerate() {
             if !n.active {
                 continue;
             };
+
+            active_nb += 1;
 
             m[n.x][n.y].active = false;
 
@@ -437,7 +512,8 @@ fn step(m: &mut Matrix) -> bool {
         }
     }
 
-    true
+    // stop if there's no solution
+    return active_nb > 0;
 }
 
 fn mark_path(m: &mut Matrix, n: &Node) {
