@@ -511,8 +511,7 @@ fn step(m: &mut Matrix) -> bool {
             let nbs = m.neighbours(n.x, n.y);
             for nb in nbs {
                 if nb.is_target() {
-                    let _end = mark_path(m, n);
-                    // end.print();
+                    mark_path(m, n);
                     return false;
                 } else if nb.is_empty() {
                     m[nb.x][nb.y].visit(i, j);
