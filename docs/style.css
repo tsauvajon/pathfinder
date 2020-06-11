@@ -1,10 +1,10 @@
 body {
-     background: #282a36;
+    background: #282a36;
+    color: #f8f8f2;
 }
 
 button {
     background: #bd93f9;
-    color: #f8f8f2;
     /* background: linear-gradient(20deg, #c576db, #8b81fc); */
     border: none;
     padding: 10px;
@@ -29,27 +29,47 @@ button > span {
     vertical-align: middle;
 }
 
-.board {
+.disable-select {
+    user-select: none; /* supported by Chrome and Opera */
+   -webkit-user-select: none; /* Safari */
+   -khtml-user-select: none; /* Konqueror HTML */
+   -moz-user-select: none; /* Firefox */
+   -ms-user-select: none; /* Internet Explorer/Edge */
+}
+
+.board, .help {
     padding: 0;
     margin: auto;
 }
-.row {
+.row, .help {
     display: flex;
+}
+.help {
+    margin: 10px 0;
+}
+.help .cell {
+    height: 15px;
+    width: 15px;
+    margin: 0 5px;
 }
 .cell {
     border: 1px solid #c576db1a;
     padding: 1px;
     margin: 0;
     /* height: 5px; */
-    width: 20px;
+    width: 30px;
+    height: 30px;
     cursor: pointer;
-    transition: background-color 1s;
+    transition: background-color .3s;
 }
 .cell.empty {
     background: #383a59;
 }
 .cell.start {
     background: #8be9fd;
+}
+.cell.wall {
+    background: #ff5555;
 }
 .cell.visited {
     background: #6272a4;

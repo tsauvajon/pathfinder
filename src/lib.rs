@@ -5,6 +5,7 @@ use wasm_bindgen::prelude::*;
 use yew::prelude::*;
 use yew::services::{ConsoleService, IntervalService, Task};
 
+use crate::State::Start;
 use std::fmt;
 
 #[derive(fmt::Debug, Copy, Clone, PartialEq)]
@@ -14,6 +15,17 @@ pub enum State {
     Visited,
     Path,
     Target,
+    Wall,
+}
+
+#[derive(Copy, Clone)]
+pub enum Stage {
+    Init,
+    StartSet,
+    TargetSet,
+    Started,
+    Paused,
+    Done,
 }
 
 impl fmt::Display for State {
@@ -24,6 +36,20 @@ impl fmt::Display for State {
             State::Start => write!(f, "O"),
             State::Path => write!(f, "+"),
             State::Target => write!(f, "x"),
+            State::Wall => write!(f, "|"),
+        }
+    }
+}
+
+impl fmt::Display for Stage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Stage::Init => write!(f, "Init"),
+            Stage::StartSet => write!(f, "StartSet"),
+            Stage::TargetSet => write!(f, "TargetSet"),
+            Stage::Started => write!(f, "Started"),
+            Stage::Paused => write!(f, "Paused"),
+            Stage::Done => write!(f, "Done"),
         }
     }
 }
@@ -33,6 +59,7 @@ fn state_class(state: State) -> String {
         State::Path => String::from("path"),
         State::Empty => String::from("empty"),
         State::Start => String::from("start"),
+        State::Wall => String::from("wall"),
         State::Visited => String::from("visited"),
         State::Target => String::from("target"),
     }
@@ -42,8 +69,8 @@ fn state_class(state: State) -> String {
 pub struct Node {
     x: usize,
     y: usize,
-    state: State,
     active: bool,
+    state: State,
     parent_coords: Option<(usize, usize)>,
 }
 
@@ -55,7 +82,6 @@ impl Node {
             state: State::Empty,
             active: false,
             parent_coords: None,
-            // link: ComponentLink<Self>::new,
         }
     }
 
@@ -111,8 +137,12 @@ impl Node {
 
 pub enum Msg {
     Next,
-    Random,
-    // Select(usize, usize),
+    Reset,
+    Start,
+
+    Hover(usize, usize),
+    Down(usize, usize),
+    Up(usize, usize),
 }
 
 impl Component for Grid {
@@ -122,18 +152,18 @@ impl Component for Grid {
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
         let callback = link.callback(|_| Msg::Next);
         let mut interval = IntervalService::new();
-        let handle = interval.spawn(Duration::from_millis(200), callback);
+        let handle = interval.spawn(Duration::from_millis(50), callback);
 
-        let mut m = new_matrix(20, 20);
-
-        m[3][3].set_start();
-        m[14][14].set_target();
+        let mut m = new_matrix(20, 40);
 
         let g = Self {
-            done: false,
+            stage: Stage::Init,
             matrix: m,
             link,
             steps: 0,
+            start: None,
+            target: None,
+            down: false,
             job: Box::new(handle), // enable interval
         };
 
@@ -144,27 +174,67 @@ impl Component for Grid {
         let mut console = ConsoleService::new();
         console.log(format!("{}", self.matrix[10][10].state).as_ref());
         match msg {
-            Msg::Next => {
-                if self.done {
-                    return false;
-                }
-                if step(&mut self.matrix) {
-                    self.steps += 1;
-                    true
-                } else {
-                    console.log("done");
-                    self.done = true;
+            Msg::Next => match self.stage {
+                Stage::Started => {
+                    if step(&mut self.matrix) {
+                        self.steps += 1;
+                    } else {
+                        console.log("done");
+                        self.stage = Stage::Done;
+                    }
                     true
                 }
-            }
-            Msg::Random => {
-                self.done = false;
-                self.matrix = new_matrix(30, 30);
-                self.matrix[23][28].set_start();
-                self.matrix[1][9].set_target();
+                _ => false,
+            },
+            Msg::Reset => {
+                self.stage = Stage::Init;
+                self.matrix = new_matrix(20, 40);
 
                 true
             }
+            Msg::Hover(i, j) => {
+                if !self.down {
+                    return false;
+                }
+                self.activate(i, j)
+            }
+            Msg::Down(i, j) => {
+                self.down = true;
+                self.activate(i, j)
+            }
+            Msg::Up(_, _) => {
+                self.down = false;
+                match self.stage {
+                    Stage::Init => {
+                        if let Some(_) = self.start {
+                            self.stage = Stage::StartSet;
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    Stage::StartSet => {
+                        if let Some(_) = self.target {
+                            self.stage = Stage::TargetSet;
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    _ => false,
+                }
+            }
+            Msg::Start => match self.stage {
+                Stage::Paused | Stage::TargetSet => {
+                    self.stage = Stage::Started;
+                    true
+                }
+                Stage::Started => {
+                    self.stage = Stage::Paused;
+                    true
+                }
+                _ => false,
+            },
         }
     }
 
@@ -178,24 +248,103 @@ impl Component for Grid {
     fn view(&self) -> Html {
         html! {
             <>
-            <button onclick=self.link.callback(|_| Msg::Random)>{"Reset"}</button>
-            // { self.value }
-            <div class="board">
-                {
-                    for self.matrix.iter().map(|mut row| {
-                        html! {
-                            <div class="row">
-                                {
-                                    for row.iter().map(|n| {
-                                        html! { <span class=("cell", state_class(n.state))>{'\u{00a0}'}</span> }
-                                    })
+            <button onclick=self.link.callback(|_| Msg::Reset)>{"Reset"}</button>
+            <button onclick=self.link.callback(|_| Msg::Start)>{"Start/Pause"}</button>
+            <br />
+            <div class="help">{ self.help() }</div>
+            <div>{ self.stage }{ self.steps }</div>
+            <div class="board disable-select">
+            {
+                for self.matrix.iter().enumerate().map(|(i, mut row)| {
+                    html! {
+                        <div class="row">
+                        {
+                            for row.iter().enumerate().map(|(j, n)| {
+                                html! {
+                                    <span
+                                        class=("cell", state_class(n.state))
+                                        onmouseover=self.link.callback(move |_| Msg::Hover(i, j))
+                                        onmousedown=self.link.callback(move |_| Msg::Down(i, j))
+                                        onmouseup=self.link.callback(move |_| Msg::Up(i, j))
+                                    >
+                                        {'\u{00a0}'}
+                                    </span>
                                 }
-                            </div>
+                            })
                         }
-                    })
-                }
+                        </div>
+                    }
+                })
+            }
             </div>
             </>
+        }
+    }
+}
+
+impl Grid {
+    fn help(&self) -> Html {
+        html! {
+            <>
+            {"Next step:"}
+            {'\u{00a0}'}
+            {
+                match self.stage {
+                    Stage::Init => html! {<>{"mark"}<div class="cell start" />{"start"}</>},
+                    Stage::StartSet => html! {<>{"mark"}<div class="cell target" />{"target"}</>},
+                    Stage::TargetSet =>html! {<>{"mark"}<div class="cell wall" />{"wall"}</>},
+                    Stage::Started => html! {"solving..."},
+                    Stage::Paused => html! {"paused"},
+                    Stage::Done => html! {"shortest path found!"},
+                }
+            }
+            </>
+        }
+    }
+
+    // mouse down, either initially or on reaching a new cell
+    fn activate(&mut self, i: usize, j: usize) -> bool {
+        match self.stage {
+            Stage::Init => {
+                if let Some((x, y)) = self.start {
+                    self.matrix[x][y].state = State::Empty;
+                };
+
+                self.matrix[i][j].set_start();
+                self.start = Some((i, j));
+                // self.stage = Stage::StartSet;
+                true
+            }
+            Stage::StartSet => match self.matrix[i][j].state {
+                State::Start => false,
+                _ => {
+                    if let Some((x, y)) = self.target {
+                        self.matrix[x][y].state = State::Empty;
+                    };
+
+                    self.matrix[i][j].set_target();
+                    self.target = Some((i, j));
+
+                    true
+                }
+            },
+            Stage::TargetSet => match self.matrix[i][j].state {
+                State::Start | State::Target => false,
+                _ => {
+                    self.matrix[i][j].state = State::Wall;
+                    true
+                }
+            },
+            Stage::Started => false,
+            Stage::Paused => false,
+            Stage::Done => {
+                if self.matrix[i][j].state != State::Target {
+                    false
+                } else {
+                    true
+                }
+                // TODO: move target and solve
+            }
         }
     }
 }
@@ -205,21 +354,20 @@ pub fn run_app() {
     App::<Grid>::new().mount_to_body();
 }
 
-///////////////
-
 pub type Matrix = Vec<Vec<Node>>;
 
-fn new_matrix(width: usize, height: usize) -> Matrix {
+fn new_matrix(height: usize, width: usize) -> Matrix {
     let mut g = vec![];
-    for i in 0..width {
+    for i in 0..height {
         let mut row: Vec<Node> = vec![];
-        for j in 0..height {
+        for j in 0..width {
             row.push(Node::new(i, j));
         }
         g.push(row);
     }
     g
 }
+
 pub trait MatrixMethods {
     fn neighbours(&self, i: usize, j: usize) -> Vec<Node>;
     fn width(&self) -> usize;
@@ -235,9 +383,7 @@ impl MatrixMethods for Matrix {
         for p in possible_nb {
             let nb_i = (i as isize + p.0) as usize;
             let nb_j = (j as isize + p.1) as usize;
-            if (0..self.width() as usize).contains(&nb_i)
-                && (0..self.height() as usize).contains(&nb_j)
-            {
+            if nb_i < self.height() && nb_j < self.width() {
                 nb.push(self[nb_i][nb_j].clone());
             }
         }
@@ -245,20 +391,27 @@ impl MatrixMethods for Matrix {
         nb
     }
 
-    fn width(&self) -> usize {
+    fn height(&self) -> usize {
         self.len()
     }
 
-    fn height(&self) -> usize {
+    fn width(&self) -> usize {
         self[0].len()
     }
 }
 
 pub struct Grid {
-    matrix: Matrix,
     link: ComponentLink<Self>,
+    matrix: Matrix,
+
+    // state
     steps: i64,
-    done: bool,
+    start: Option<(usize, usize)>,
+    target: Option<(usize, usize)>,
+    stage: Stage,
+    down: bool,
+
+    // Worker
     job: Box<Task>,
 }
 
@@ -274,7 +427,7 @@ fn step(m: &mut Matrix) -> bool {
             let nbs = m.neighbours(n.x, n.y);
             for nb in nbs {
                 if nb.is_target() {
-                    let end = mark_path(m, n);
+                    let _end = mark_path(m, n);
                     // end.print();
                     return false;
                 } else if nb.is_empty() {
