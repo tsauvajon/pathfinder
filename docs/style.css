@@ -4,29 +4,23 @@ body {
 }
 
 button {
-    background: #bd93f9;
-    /* background: linear-gradient(20deg, #c576db, #8b81fc); */
-    border: none;
-    padding: 10px;
-    border-radius: 5px;
+    background: #282a36;
+    border: 1px solid #bd93f9;
+    color: #bcc2cd;
     cursor: pointer;
-    color: #fff;
-    font-weight: bold;
-    font-family: 'Raleway';
-    font-size: 15px;
-    border: 2px solid transparent;
-    transition: all .6s;
-    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2), 0 3px 10px 0 rgba(0,0,0,0.19);
-    vertical-align: middle;
+    display: inline-block;
+    font-family: Source Sans Pro;
+    outline: none;
+    padding: 5px 20px;
+    transition: all .3s ease-in-out;
 }
 button:hover {
-    background: #fff;
-    border: 2px solid #8b81fc;
-    color: #8b81fc;
+    background: #bd93f9;
+    color: #000;
 }
-button > img,
-button > span {
-    vertical-align: middle;
+.help button {
+    margin: -3px 0 0 10px;
+    padding: 3px 10px;
 }
 
 .disable-select {
@@ -37,15 +31,37 @@ button > span {
    -ms-user-select: none; /* Internet Explorer/Edge */
 }
 
-.board, .help {
-    padding: 0;
+
+.help {
+    top: 20px;
+    left: 20px;
+}
+
+.main {
+    top: 100px;
+    right: 20px;
+    display: grid;
+}
+
+.menu {
+    z-index: 5;
+    position: fixed;
+    padding: 20px;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    border-radius: 8px;
+    box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.5);
+    cursor: default;
+}
+
+.board {
+    padding: auto;
     margin: auto;
+    background: #6272a4;
 }
 .row, .help {
     display: flex;
-}
-.help {
-    margin: 10px 0;
+    margin: auto;
 }
 .help .cell {
     height: 15px;
@@ -69,7 +85,7 @@ button > span {
     background: #8be9fd;
 }
 .cell.wall {
-    background: #ff5555;
+    background: #f8f8f2;
 }
 .cell.visited {
     background: #6272a4;
@@ -290,4 +306,32 @@ button > span {
 .animate__zoomIn {
   -webkit-animation-name: zoomIn;
   animation-name: zoomIn;
+}
+
+
+.pop{
+  animation-name: pop;
+  animation-duration: 0.3s;
+  animation-timing-function: ease-out;
+  animation-direction: alternate;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+  /*
+  animation-delay: 0;
+  animation-play-state: running;
+  */
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(.3);
+  }
+
+  50% {
+    transform: scale(1.2);
+  }
+
+  100% {
+    transform: scale(1.0);
+  }
 }

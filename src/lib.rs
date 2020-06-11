@@ -2,12 +2,14 @@
 
 use wasm_bindgen::prelude::*;
 use yew::prelude::*;
-use yew::services::{IntervalService, Task};
+use yew::services::{resize::WindowDimensions, ConsoleService, IntervalService, Task};
+
+use yew::utils::window;
 
 use std::fmt;
 use std::time::Duration;
 
-#[derive(fmt::Debug, Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum State {
     Empty,
     Start,
@@ -15,6 +17,17 @@ pub enum State {
     Path,
     Target,
     Wall,
+}
+
+fn state_class(state: State) -> String {
+    match state {
+        State::Path => String::from("path pop"),
+        State::Empty => String::from("empty"),
+        State::Start => String::from("start pop"),
+        State::Wall => String::from("wall pop"),
+        State::Visited => String::from("visited"),
+        State::Target => String::from("target pop"),
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -27,44 +40,7 @@ pub enum Stage {
     Done,
 }
 
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            State::Empty => write!(f, "."),
-            State::Visited => write!(f, "_"),
-            State::Start => write!(f, "O"),
-            State::Path => write!(f, "+"),
-            State::Target => write!(f, "x"),
-            State::Wall => write!(f, "|"),
-        }
-    }
-}
-
-impl fmt::Display for Stage {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Stage::Init => write!(f, "Init"),
-            Stage::StartSet => write!(f, "StartSet"),
-            Stage::TargetSet => write!(f, "TargetSet"),
-            Stage::Started => write!(f, "Started"),
-            Stage::Paused => write!(f, "Paused"),
-            Stage::Done => write!(f, "Done"),
-        }
-    }
-}
-
-fn state_class(state: State) -> String {
-    match state {
-        State::Path => String::from("path"),
-        State::Empty => String::from("empty"),
-        State::Start => String::from("start"),
-        State::Wall => String::from("wall"),
-        State::Visited => String::from("visited"),
-        State::Target => String::from("target"),
-    }
-}
-
-#[derive(fmt::Debug, Clone)]
+#[derive(Clone)]
 pub struct Node {
     x: usize,
     y: usize,
@@ -132,7 +108,23 @@ pub enum Msg {
 
     Hover(usize, usize),
     Down(usize, usize),
-    Up(usize, usize),
+    Up(),
+}
+
+const CELL_WIDTH: i32 = 30;
+const CELL_HEIGHT: i32 = 30;
+
+fn get_grid_dimensions() -> (usize, usize) {
+    let ww = window();
+    let wd = WindowDimensions::get_dimensions(&ww);
+
+    let mut console = ConsoleService::new();
+
+    let h = (wd.height / CELL_HEIGHT) - 4;
+    let w = (wd.width / CELL_WIDTH) - 2;
+
+    console.log(format!("wdh:{} wdw:{} h:{} w:{}", wd.height, wd.width, h, w).as_ref());
+    (h as usize, w as usize)
 }
 
 impl Component for Grid {
@@ -144,9 +136,11 @@ impl Component for Grid {
         let mut interval = IntervalService::new();
         let handle = interval.spawn(Duration::from_millis(100), callback);
 
+        let (h, w) = get_grid_dimensions();
+
         let g = Self {
             stage: Stage::Init,
-            matrix: new_matrix(20, 40),
+            matrix: new_matrix(h, w),
             link,
             steps: 0,
             start: None,
@@ -175,7 +169,8 @@ impl Component for Grid {
             },
             Msg::Reset => {
                 self.stage = Stage::Init;
-                self.matrix = new_matrix(20, 40);
+                let (h, w) = get_grid_dimensions();
+                self.matrix = new_matrix(h, w);
 
                 true
             }
@@ -189,7 +184,7 @@ impl Component for Grid {
                 self.down = true;
                 self.activate(i, j)
             }
-            Msg::Up(_, _) => {
+            Msg::Up() => {
                 self.down = false;
                 match self.stage {
                     Stage::Init => {
@@ -239,25 +234,29 @@ impl Component for Grid {
     fn view(&self) -> Html {
         html! {
             <>
-            <button onclick=self.link.callback(|_| Msg::Reset)>{"Reset"}</button>
-            {
-                match self.stage {
-                    Stage::TargetSet | Stage::Paused => html! {
-                        <button onclick=self.link.callback(|_| Msg::Start)>
-                        {"Start"}
-                        </button>
-                    },
-                    Stage::Started => html! {
-                        <button onclick=self.link.callback(|_| Msg::Start)>
-                        {"Pause"}
-                        </button>
-                    },
-                    _ => html!{},
+            <div class="main menu">
+                <button onclick=self.link.callback(|_| Msg::Reset)>{"Reset"}</button>
+                {
+                    match self.stage {
+                        Stage::TargetSet | Stage::Paused => html! {
+                            <button onclick=self.link.callback(|_| Msg::Start)>
+                            {"Start"}
+                            </button>
+                        },
+                        Stage::Started => html! {
+                            <button onclick=self.link.callback(|_| Msg::Start)>
+                            {"Pause"}
+                            </button>
+                        },
+                        _ => html!{},
+                    }
                 }
-            }
-            <br />
-            <div class="help">{ self.help() }</div>
-            <div class="board disable-select">
+            </div>
+            <div class="help menu">{ self.help() }</div>
+            <div
+                class="board disable-select"
+                onmouseup=self.link.callback(move |_| Msg::Up())
+            >
             {
                 for self.matrix.iter().enumerate().map(|(i, mut row)| {
                     html! {
@@ -269,7 +268,6 @@ impl Component for Grid {
                                         class=("cell", state_class(n.state))
                                         onmouseover=self.link.callback(move |_| Msg::Hover(i, j))
                                         onmousedown=self.link.callback(move |_| Msg::Down(i, j))
-                                        onmouseup=self.link.callback(move |_| Msg::Up(i, j))
                                     >
                                         {'\u{00a0}'}
                                     </span>
@@ -292,18 +290,27 @@ impl Grid {
             <>
             {
                 match self.stage {
-                    Stage::Init => html! {<>{"Place"}<div class="cell start" />{"start"}</>},
-                    Stage::StartSet => html! {<>{"Place"}<div class="cell target" />{"target"}</>},
-                    Stage::TargetSet =>html! {<>{"Place"}<div class="cell wall" />{"walls and Start when ready"}</>},
+                    Stage::Init => html! {<>{"Place"}<div class="cell start" />{" start node"}</>},
+                    Stage::StartSet => html! {<>{"Place"}<div class="cell target" />{" target node"}</>},
+                    Stage::TargetSet =>html! {
+                        <>
+                        {"Place"}
+                        <div class="cell wall" />
+                        {"walls, then"}
+                        <button onclick=self.link.callback(|_| Msg::Start)>
+                            {"Start"}
+                        </button>
+                        </>
+                    },
                     Stage::Started => html! {"Solving..."},
                     Stage::Paused => html! {"Paused"},
                     Stage::Done => html! {
                         <>
                         {"Move"}
                         <div class="cell start" />
-                        {"start or"}
+                        {"/"}
                         <div class="cell target" />
-                        {"target around!"}
+                        {"around!"}
                         </>
                     },
                 }
@@ -314,6 +321,7 @@ impl Grid {
 
     pub fn set_start(&mut self, i: usize, j: usize) {
         if let Some((i, j)) = self.start {
+            self.matrix[i][j].active = false;
             self.matrix[i][j].state = State::Empty;
         };
 
@@ -393,6 +401,7 @@ impl Grid {
         for i in 0..self.matrix.height() {
             for j in 0..self.matrix.width() {
                 self.matrix[i][j].active = false;
+                self.matrix[i][j].parent_coords = None;
                 match self.matrix[i][j].state {
                     State::Start => self.matrix[i][j].active = true,
                     State::Target | State::Wall | State::Empty => {}
