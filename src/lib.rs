@@ -146,8 +146,7 @@ impl Component for Grid {
             start: None,
             target: None,
             down: false,
-            moving_target: false,
-            moving_start: false,
+            currently_moving: None,
             job: Box::new(handle), // enable interval
         };
 
@@ -203,8 +202,7 @@ impl Component for Grid {
                         None => false,
                     },
                     Stage::Done => {
-                        self.moving_start = false;
-                        self.moving_target = false;
+                        self.currently_moving = None;
                         false
                     }
                     _ => false,
@@ -310,6 +308,8 @@ impl Grid {
                         <div class="cell start" />
                         {"/"}
                         <div class="cell target" />
+                        {"/"}
+                        <div class="cell wall" />
                         {"around!"}
                         </>
                     },
@@ -362,36 +362,58 @@ impl Grid {
             },
             Stage::Started => false,
             Stage::Paused => false,
-            Stage::Done => {
-                match self.matrix[i][j].state {
-                    State::Target => {
-                        if !self.moving_target && !self.moving_start {
-                            self.moving_target = true;
-                        }
+            Stage::Done => match self.matrix[i][j].state {
+                State::Target | State::Start => {
+                    if self.currently_moving.is_none() {
+                        self.currently_moving = Some(self.matrix[i][j].state);
                     }
-                    State::Start => {
-                        if !self.moving_target && !self.moving_start {
-                            self.moving_start = true;
-                        }
+                    false
+                }
+                State::Wall => match self.currently_moving {
+                    None => {
+                        self.currently_moving = Some(State::Empty);
+                        self.matrix[i][j].state = State::Empty;
+                        self.update_solution();
+                        true
                     }
-                    State::Wall => {}
-                    _ => {
-                        if self.moving_target {
-                            self.set_target(i, j);
-                            self.update_solution();
-                            return true;
-                        }
-
-                        if self.moving_start {
+                    Some(State::Empty) => {
+                        self.matrix[i][j].state = State::Empty;
+                        self.update_solution();
+                        true
+                    }
+                    Some(_) => false,
+                },
+                _ => match self.currently_moving {
+                    None => {
+                        self.currently_moving = Some(State::Wall);
+                        self.matrix[i][j].state = State::Wall;
+                        self.update_solution();
+                        true
+                    }
+                    Some(state) => match state {
+                        State::Start => {
                             self.set_start(i, j);
                             self.update_solution();
-                            return true;
+                            true
                         }
-                    }
-                }
-
-                false
-            }
+                        State::Target => {
+                            self.set_target(i, j);
+                            self.update_solution();
+                            true
+                        }
+                        State::Wall => {
+                            self.matrix[i][j].state = State::Wall;
+                            self.update_solution();
+                            true
+                        }
+                        _ => {
+                            self.matrix[i][j].state = State::Empty;
+                            self.update_solution();
+                            true
+                        }
+                    },
+                },
+            },
         }
     }
 
@@ -488,8 +510,7 @@ pub struct Grid {
 
     // flags
     down: bool,
-    moving_target: bool,
-    moving_start: bool,
+    currently_moving: Option<State>,
 
     // Worker
     job: Box<Task>,
