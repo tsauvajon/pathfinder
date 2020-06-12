@@ -30,6 +30,14 @@ fn state_class(state: State) -> String {
     }
 }
 
+fn active_class(n: &Node) -> String {
+    if n.active && n.state == State::Empty {
+        String::from("wall")
+    } else {
+        String::from("")
+    }
+}
+
 #[derive(Copy, Clone)]
 pub enum Stage {
     Init,
@@ -175,9 +183,10 @@ impl Component for Grid {
             }
             Msg::Hover(i, j) => {
                 if !self.down {
-                    return false;
+                    false
+                } else {
+                    self.activate(i, j)
                 }
-                self.activate(i, j)
             }
             Msg::Down(i, j) => {
                 self.down = true;
@@ -185,6 +194,7 @@ impl Component for Grid {
             }
             Msg::Up() => {
                 self.down = false;
+                self.currently_moving = None;
                 match self.stage {
                     Stage::Init => {
                         if let Some(_) = self.start {
@@ -201,10 +211,7 @@ impl Component for Grid {
                         }
                         None => false,
                     },
-                    Stage::Done => {
-                        self.currently_moving = None;
-                        false
-                    }
+                    Stage::Done => false,
                     _ => false,
                 }
             }
@@ -263,7 +270,7 @@ impl Component for Grid {
                             for row.iter().enumerate().map(|(j, n)| {
                                 html! {
                                     <span
-                                        class=("cell", state_class(n.state))
+                                        class=("cell", state_class(n.state), active_class(n))
                                         onmouseover=self.link.callback(move |_| Msg::Hover(i, j))
                                         onmousedown=self.link.callback(move |_| Msg::Down(i, j))
                                     >
@@ -353,65 +360,63 @@ impl Grid {
                     true
                 }
             },
-            Stage::TargetSet => match self.matrix[i][j].state {
-                State::Start | State::Target => false,
-                _ => {
+            Stage::TargetSet => self.change_cell(i, j),
+            Stage::Started => false,
+            Stage::Paused => false,
+            Stage::Done => {
+                let should_move = self.change_cell(i, j);
+                if should_move {
+                    self.update_solution()
+                }
+                should_move
+            }
+        }
+    }
+
+    // should we change a cell from one state to another?
+    fn change_cell(&mut self, i: usize, j: usize) -> bool {
+        match self.matrix[i][j].state {
+            State::Target | State::Start => {
+                if self.currently_moving.is_none() {
+                    self.currently_moving = Some(self.matrix[i][j].state);
+                }
+                false
+            }
+            State::Wall => match self.currently_moving {
+                None => {
+                    self.currently_moving = Some(State::Empty);
+                    self.matrix[i][j].state = State::Empty;
+                    true
+                }
+                Some(State::Empty) => {
+                    self.matrix[i][j].state = State::Empty;
+                    true
+                }
+                Some(_) => false,
+            },
+            _ => match self.currently_moving {
+                None => {
+                    self.currently_moving = Some(State::Wall);
                     self.matrix[i][j].state = State::Wall;
                     true
                 }
-            },
-            Stage::Started => false,
-            Stage::Paused => false,
-            Stage::Done => match self.matrix[i][j].state {
-                State::Target | State::Start => {
-                    if self.currently_moving.is_none() {
-                        self.currently_moving = Some(self.matrix[i][j].state);
-                    }
-                    false
-                }
-                State::Wall => match self.currently_moving {
-                    None => {
-                        self.currently_moving = Some(State::Empty);
-                        self.matrix[i][j].state = State::Empty;
-                        self.update_solution();
+                Some(state) => match state {
+                    State::Start => {
+                        self.set_start(i, j);
                         true
                     }
-                    Some(State::Empty) => {
-                        self.matrix[i][j].state = State::Empty;
-                        self.update_solution();
+                    State::Target => {
+                        self.set_target(i, j);
                         true
                     }
-                    Some(_) => false,
-                },
-                _ => match self.currently_moving {
-                    None => {
-                        self.currently_moving = Some(State::Wall);
+                    State::Wall => {
                         self.matrix[i][j].state = State::Wall;
-                        self.update_solution();
                         true
                     }
-                    Some(state) => match state {
-                        State::Start => {
-                            self.set_start(i, j);
-                            self.update_solution();
-                            true
-                        }
-                        State::Target => {
-                            self.set_target(i, j);
-                            self.update_solution();
-                            true
-                        }
-                        State::Wall => {
-                            self.matrix[i][j].state = State::Wall;
-                            self.update_solution();
-                            true
-                        }
-                        _ => {
-                            self.matrix[i][j].state = State::Empty;
-                            self.update_solution();
-                            true
-                        }
-                    },
+                    _ => {
+                        self.matrix[i][j].state = State::Empty;
+                        true
+                    }
                 },
             },
         }
