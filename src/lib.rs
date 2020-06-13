@@ -30,14 +30,6 @@ fn state_class(state: State) -> String {
     }
 }
 
-fn active_class(n: &Node) -> String {
-    if n.active && n.state == State::Empty {
-        String::from("wall")
-    } else {
-        String::from("")
-    }
-}
-
 #[derive(Copy, Clone)]
 pub enum Stage {
     Init,
@@ -270,7 +262,7 @@ impl Component for Grid {
                             for row.iter().enumerate().map(|(j, n)| {
                                 html! {
                                     <span
-                                        class=("cell", state_class(n.state), active_class(n))
+                                        class=("cell", state_class(n.state))
                                         onmouseover=self.link.callback(move |_| Msg::Hover(i, j))
                                         onmousedown=self.link.callback(move |_| Msg::Down(i, j))
                                     >
