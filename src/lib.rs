@@ -30,6 +30,14 @@ fn state_class(state: State) -> String {
     }
 }
 
+fn solving_class(stage: Stage) -> String {
+    if let Stage::Started = stage {
+        String::from("solving")
+    } else {
+        String::new()
+    }
+}
+
 #[derive(Copy, Clone)]
 pub enum Stage {
     Init,
@@ -251,7 +259,7 @@ impl Component for Grid {
             </div>
             <div class="help menu">{ self.help() }</div>
             <div
-                class="board disable-select"
+                class=("board", "disable-select", solving_class(self.stage))
                 onmouseup=self.link.callback(move |_| Msg::Up())
             >
             {
@@ -262,7 +270,7 @@ impl Component for Grid {
                             for row.iter().enumerate().map(|(j, n)| {
                                 html! {
                                     <span
-                                        class=("cell", state_class(n.state))
+                                        class=("cell", state_class(n.state), if n.active { "active" } else {""})
                                         onmouseover=self.link.callback(move |_| Msg::Hover(i, j))
                                         onmousedown=self.link.callback(move |_| Msg::Down(i, j))
                                     >
