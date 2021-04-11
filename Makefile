@@ -5,6 +5,9 @@
 build: ## Build the Yew app
 	wasm-pack build --target web --out-name wasm --out-dir ./docs
 
+dependencies: ## Get the development dependencies
+	cargo install miniserve
+
 serve: ## Serve locally on port 8888
 	miniserve ./docs --index index.html -p 8888
 

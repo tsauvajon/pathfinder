@@ -89,11 +89,12 @@ button:hover {
 .cell.visited {
     background: #6272a4;
 }
-.solving .cell.visited.active {
+.cell.visited.active {
     animation-name: activate;
-    animation-duration: .5s;
+    animation-duration: 1s;
     animation-timing-function: ease-out;
     animation-fill-mode: forwards;
+    animation-delay: 0.3s;
 }
 .cell.path {
     background: #f1fa8c;

@@ -8,7 +8,10 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-yew = "0.16"
-wasm-bindgen = "0.2"
-rand = "0.7.3"
 console_error_panic_hook = "0.1.6"
+rand = "0.7.3"
+wasm-bindgen = "0.2"
+yew = "0.16"
+
+[build-dependencies]
+wasm-pack = "0.9.1"

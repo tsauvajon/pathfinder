@@ -9,6 +9,8 @@ use yew::utils::window;
 use std::fmt;
 use std::time::Duration;
 
+type more = bool;
+
 #[derive(Copy, Clone, PartialEq)]
 pub enum State {
     Empty,
@@ -521,7 +523,7 @@ pub struct Grid {
     job: Box<Task>,
 }
 
-fn step(m: &mut Matrix) -> bool {
+fn step(m: &mut Matrix) -> more {
     let mut active_nb = 0;
 
     for (i, r) in m.clone().iter().enumerate() {
