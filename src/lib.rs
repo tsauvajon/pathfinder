@@ -1,15 +1,12 @@
 #![recursion_limit = "512"]
 
+use std::time::Duration;
 use wasm_bindgen::prelude::*;
 use yew::prelude::*;
 use yew::services::{resize::WindowDimensions, ConsoleService, IntervalService, Task};
-
 use yew::utils::window;
 
-use std::fmt;
-use std::time::Duration;
-
-type more = bool;
+type More = bool;
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum State {
@@ -33,10 +30,9 @@ fn state_class(state: State) -> String {
 }
 
 fn solving_class(stage: Stage) -> String {
-    if let Stage::Started = stage {
-        String::from("solving")
-    } else {
-        String::new()
+    match stage {
+        Stage::Started => String::from("solving"),
+        _ => String::new(),
     }
 }
 
@@ -118,7 +114,7 @@ pub enum Msg {
 
     Hover(usize, usize),
     Down(usize, usize),
-    Up(),
+    Up,
 }
 
 const CELL_WIDTH: i32 = 30;
@@ -194,7 +190,7 @@ impl Component for Grid {
                 self.down = true;
                 self.activate(i, j)
             }
-            Msg::Up() => {
+            Msg::Up => {
                 self.down = false;
                 self.currently_moving = None;
                 match self.stage {
@@ -262,7 +258,7 @@ impl Component for Grid {
             <div class="help menu">{ self.help() }</div>
             <div
                 class=("board", "disable-select", solving_class(self.stage))
-                onmouseup=self.link.callback(move |_| Msg::Up())
+                onmouseup=self.link.callback(move |_| Msg::Up)
             >
             {
                 for self.matrix.iter().enumerate().map(|(i, mut row)| {
@@ -520,10 +516,11 @@ pub struct Grid {
     currently_moving: Option<State>,
 
     // Worker
-    job: Box<Task>,
+    #[allow(dead_code)] // It is used by Yew to enable JS interval
+    job: Box<dyn Task>,
 }
 
-fn step(m: &mut Matrix) -> more {
+fn step(m: &mut Matrix) -> More {
     let mut active_nb = 0;
 
     for (i, r) in m.clone().iter().enumerate() {
