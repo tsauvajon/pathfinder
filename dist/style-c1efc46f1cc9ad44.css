@@ -1,0 +1,136 @@
+body {
+    background: #282a36;
+    color: #f8f8f2;
+}
+
+button {
+    background: #282a36;
+    border: 1px solid #bd93f9;
+    color: #bcc2cd;
+    cursor: pointer;
+    display: inline-block;
+    font-family: Source Sans Pro;
+    outline: none;
+    padding: 5px 20px;
+    transition: all .3s ease-in-out;
+}
+button:hover {
+    background: #bd93f9;
+    color: #000;
+}
+.help button {
+    margin: -3px 0 0 10px;
+    padding: 3px 10px;
+}
+
+.disable-select {
+    user-select: none; /* supported by Chrome and Opera */
+   -webkit-user-select: none; /* Safari */
+   -khtml-user-select: none; /* Konqueror HTML */
+   -moz-user-select: none; /* Firefox */
+   -ms-user-select: none; /* Internet Explorer/Edge */
+}
+
+.help {
+    top: 20px;
+    left: 20px;
+}
+
+.main {
+    top: 100px;
+    right: 20px;
+    display: grid;
+}
+
+.menu {
+    z-index: 5;
+    position: fixed;
+    padding: 20px;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    border-radius: 8px;
+    box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.5);
+    cursor: default;
+}
+
+.board {
+    padding: auto;
+    margin: auto;
+    background: #6272a4;
+}
+.row, .help {
+    display: flex;
+    margin: auto;
+}
+.help .cell {
+    height: 15px;
+    width: 15px;
+    margin: 0 5px;
+}
+.cell {
+    border: 1px solid #c576db1a;
+    padding: 1px;
+    margin: 0;
+    /* height: 5px; */
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    transition: background-color .3s;
+}
+.cell.empty {
+    background: #383a59;
+}
+.cell.start {
+    background: #8be9fd;
+}
+.cell.wall {
+    background: #f8f8f2;
+}
+.cell.visited {
+    background: #6272a4;
+}
+.cell.visited.active {
+    animation-name: activate;
+    animation-duration: 1s;
+    animation-timing-function: ease-out;
+    animation-fill-mode: forwards;
+    animation-delay: 0.3s;
+}
+.cell.path {
+    background: #f1fa8c;
+}
+.cell.target {
+    background: #ff79c6;
+}
+
+.pop{
+  animation-name: pop;
+  animation-duration: 0.3s;
+  animation-timing-function: ease-out;
+  animation-direction: alternate;
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(.4);
+  }
+
+  50% {
+    transform: scale(1.2);
+  }
+
+  100% {
+    transform: scale(1.0);
+  }
+}
+
+@keyframes activate {
+    0% {
+        transform: scale(.3);
+        background-color: rgba(56, 58, 89, 0.75);
+        border-radius: 100%;
+    }
+    100% {
+        background-color: rgba(98, 114, 164, 0.75);
+    }
+}
