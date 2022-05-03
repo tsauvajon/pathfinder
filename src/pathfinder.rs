@@ -1,5 +1,5 @@
 use crate::{
-    matrix::Matrix,
+    matrix::{Matrix, Solve},
     node::{state_class, State},
 };
 use gloo_timers::callback::Interval;
@@ -68,10 +68,9 @@ impl Component for Pathfinder {
         match msg {
             Msg::NextTick => match self.stage {
                 Stage::Started => {
-                    if self.matrix.step() {
-                        self.steps += 1;
-                    } else {
-                        self.stage = Stage::Done;
+                    match self.matrix.step() {
+                        Solve::Continue => self.steps += 1,
+                        Solve::Stop => self.stage = Stage::Done,
                     }
                     true
                 }
@@ -244,22 +243,22 @@ impl Pathfinder {
 impl Pathfinder {
     pub fn set_start(&mut self, i: usize, j: usize) {
         if let Some((i, j)) = self.start {
-            self.matrix.inner[i][j].active = false;
-            self.matrix.inner[i][j].state = State::Empty;
+            self.matrix.set_inactive(i, j);
+            self.matrix.set_state(i, j, State::Empty);
         };
 
         self.start = Some((i, j));
-        self.matrix.inner[i][j].state = State::Start;
-        self.matrix.inner[i][j].active = true;
+        self.matrix.set_state(i, j, State::Start);
+        self.matrix.set_active(i, j);
     }
 
     fn set_target(&mut self, i: usize, j: usize) {
         if let Some((i, j)) = self.target {
-            self.matrix.inner[i][j].state = State::Empty;
+            self.matrix.set_state(i, j, State::Empty);
         };
 
         self.target = Some((i, j));
-        self.matrix.inner[i][j].state = State::Target;
+        self.matrix.set_state(i, j, State::Target);
     }
 
     // mouse down, either initially or on reaching a new cell
@@ -269,7 +268,7 @@ impl Pathfinder {
                 self.set_start(i, j);
                 true
             }
-            Stage::StartSet => match self.matrix.inner[i][j].state {
+            Stage::StartSet => match self.matrix.state(i, j) {
                 State::Start => false,
                 _ => {
                     self.set_target(i, j);
@@ -291,21 +290,21 @@ impl Pathfinder {
 
     // should we change a cell from one state to another?
     fn change_cell(&mut self, i: usize, j: usize) -> bool {
-        match self.matrix.inner[i][j].state {
+        match self.matrix.state(i, j) {
             State::Target | State::Start => {
                 if self.currently_moving.is_none() {
-                    self.currently_moving = Some(self.matrix.inner[i][j].state);
+                    self.currently_moving = Some(self.matrix.state(i, j));
                 }
                 false
             }
             State::Wall => match self.currently_moving {
                 None => {
                     self.currently_moving = Some(State::Empty);
-                    self.matrix.inner[i][j].state = State::Empty;
+                    self.matrix.set_state(i, j, State::Empty);
                     true
                 }
                 Some(State::Empty) => {
-                    self.matrix.inner[i][j].state = State::Empty;
+                    self.matrix.set_state(i, j, State::Empty);
                     true
                 }
                 Some(_) => false,
@@ -313,7 +312,7 @@ impl Pathfinder {
             _ => match self.currently_moving {
                 None => {
                     self.currently_moving = Some(State::Wall);
-                    self.matrix.inner[i][j].state = State::Wall;
+                    self.matrix.set_state(i, j, State::Wall);
                     true
                 }
                 Some(state) => match state {
@@ -326,11 +325,11 @@ impl Pathfinder {
                         true
                     }
                     State::Wall => {
-                        self.matrix.inner[i][j].state = State::Wall;
+                        self.matrix.set_state(i, j, State::Wall);
                         true
                     }
                     _ => {
-                        self.matrix.inner[i][j].state = State::Empty;
+                        self.matrix.set_state(i, j, State::Empty);
                         true
                     }
                 },
@@ -343,12 +342,12 @@ impl Pathfinder {
     fn clear(&mut self) {
         for i in 0..self.matrix.height() {
             for j in 0..self.matrix.width() {
-                self.matrix.inner[i][j].active = false;
-                self.matrix.inner[i][j].parent_coords = None;
-                match self.matrix.inner[i][j].state {
-                    State::Start => self.matrix.inner[i][j].active = true,
+                self.matrix.set_inactive(i, j);
+                self.matrix.clear_parent(i, j);
+                match self.matrix.state(i, j) {
+                    State::Start => self.matrix.set_active(i, j),
                     State::Target | State::Wall | State::Empty => {}
-                    _ => self.matrix.inner[i][j].state = State::Empty,
+                    _ => self.matrix.set_state(i, j, State::Empty),
                 }
             }
         }
@@ -356,8 +355,9 @@ impl Pathfinder {
 
     fn solve(&mut self) {
         loop {
-            if !self.matrix.step() {
-                return;
+            match self.matrix.step() {
+                Solve::Continue => continue,
+                Solve::Stop => break,
             }
         }
     }

@@ -1,8 +1,10 @@
-use crate::node::Node;
+use crate::node::{Node, State};
 
 #[derive(Clone)]
 pub struct Matrix {
-    pub inner: Vec<Vec<Node>>,
+    inner: Vec<Vec<Node>>,
+
+    active_cells: Vec<(usize, usize)>,
 }
 
 impl Matrix {
@@ -15,7 +17,10 @@ impl Matrix {
             }
             matrix.push(row);
         }
-        Self { inner: matrix }
+        Self {
+            inner: matrix,
+            active_cells: vec![],
+        }
     }
 }
 
@@ -28,7 +33,10 @@ impl IntoIterator for Matrix {
     }
 }
 
-type More = bool;
+pub enum Solve {
+    Continue,
+    Stop,
+}
 
 impl Matrix {
     pub fn neighbours(&self, i: usize, j: usize) -> Vec<Node> {
@@ -55,39 +63,63 @@ impl Matrix {
         self.inner.len()
     }
 
-    pub fn step(&mut self) -> More {
-        let mut active_nb = 0;
+    pub fn step(&mut self) -> Solve {
+        let mut active = vec![];
 
-        for (i, r) in self.clone().into_iter().enumerate() {
-            for (j, n) in r.iter().enumerate() {
-                if !n.active {
-                    continue;
-                };
+        for (x, y) in self.active_cells.clone() {
+            self.inner[x][y].active = false;
 
-                active_nb += 1;
-
-                self.inner[n.x][n.y].active = false;
-
-                let nbs = self.neighbours(n.x, n.y);
-                for nb in nbs {
-                    if nb.is_target() {
-                        self.mark_path(n);
-                        return false;
-                    } else if nb.is_empty() {
-                        self.inner[nb.x][nb.y].visit(i, j);
-                    }
+            let neighbours = self.neighbours(x, y);
+            for neighbour in neighbours {
+                if neighbour.is_target() {
+                    self.mark_path(x, y);
+                    return Solve::Stop;
+                } else if neighbour.is_empty() {
+                    active.push((neighbour.x, neighbour.y));
+                    self.inner[neighbour.x][neighbour.y].visit(x, y);
                 }
             }
         }
 
-        // stop if there's no solution
-        return active_nb > 0;
+        self.active_cells = active;
+
+        return if self.active_cells.len() > 0 {
+            Solve::Continue
+        } else {
+            Solve::Stop
+        };
     }
 
-    fn mark_path(&mut self, n: &Node) {
-        let mut x = n.x;
-        let mut y = n.y;
+    pub fn set_active(&mut self, x: usize, y: usize) {
+        self.active_cells.push((x, y));
+        self.inner[x][y].active = true;
+    }
 
+    pub fn set_inactive(&mut self, x: usize, y: usize) {
+        self.active_cells = self
+            .active_cells
+            .iter()
+            .filter(|(a, b)| a != &x || b != &y)
+            .map(|&(a, b)| (a, b))
+            .collect();
+        self.inner[x][y].active = false;
+    }
+
+    pub fn clear_parent(&mut self, x: usize, y: usize) {
+        self.inner[x][y].parent_coords = None;
+    }
+
+    pub fn set_state(&mut self, x: usize, y: usize, state: State) {
+        self.inner[x][y].state = state;
+    }
+
+    pub fn state(&self, x: usize, y: usize) -> State {
+        self.inner[x][y].state
+    }
+
+    fn mark_path(&mut self, x: usize, y: usize) {
+        let mut x = x;
+        let mut y = y;
         loop {
             match self.inner[x][y].mark_path() {
                 Some((nx, ny)) => {
