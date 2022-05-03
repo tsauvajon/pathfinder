@@ -2,13 +2,16 @@
 .DEFAULT_GOAL := help
 .PHONY: serve build
 
-build: ## Build the Yew app
-	wasm-pack build --target web --out-name wasm --out-dir ./docs
+build: ## Build the app for static serving
+	trunk build
 
 dependencies: ## Get the development dependencies
 	cargo install miniserve
 
-serve: ## Serve locally on port 8888
+dev: ## Hot reload the app
+	trunk serve
+
+serve: build ## Serve locally on port 8888
 	miniserve ./docs --index index.html -p 8888
 
 help: ## Print this message

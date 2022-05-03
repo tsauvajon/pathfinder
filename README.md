@@ -22,6 +22,6 @@ $ cargo build
 ```
 $ make build
 ```
-This will create JavaScript/WebAssembly files in `./docs`. Why `./docs` and not `./static`? Because this project is hosted with GitHub pages which serves `./docs`.
+This will create JavaScript/WebAssembly files in `./docs`. Why `./docs` and not `./static` or `./dist`? Because this project is hosted with GitHub pages which serves `./docs`.
 
 You can use any web server to serve the `./docs` folder. To use `miniserve` (a simple Rust web server), run `make dependencies && make serve` and browse http://127.0.0.1:8888.
