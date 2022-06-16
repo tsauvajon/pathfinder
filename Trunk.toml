@@ -1,4 +1,4 @@
 [build]
 release = true
 dist = "docs"
-public_url = "./"
+public_url = "/"
